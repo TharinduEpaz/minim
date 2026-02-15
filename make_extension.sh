@@ -21,6 +21,7 @@ cat > $MANIFEST_FILE <<- EOM
   "name": "Minim",
   "description": "A minimal newtab for Chrome",
   "version": "$new_version",
+  "permissions": ["bookmarks", "favicon"],
   "action": {
     "default_popup": "index.html",
     "default_icon": {

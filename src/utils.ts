@@ -31,3 +31,16 @@ export function camelCaseToSentenceCase(str: string) {
   const result = str.replace(/([A-Z])/g, " $1");
   return result.charAt(0).toUpperCase() + result.slice(1);
 }
+
+export function getFaviconUrl(url: string, size = 16): string {
+  if (typeof chrome !== "undefined" && chrome.runtime?.getURL) {
+    const base = chrome.runtime.getURL("/_favicon/");
+    return `${base}?pageUrl=${encodeURIComponent(url)}&size=${size}`;
+  }
+  try {
+    const domain = new URL(url).hostname;
+    return `https://www.google.com/s2/favicons?domain=${domain}&sz=${size}`;
+  } catch {
+    return "";
+  }
+}

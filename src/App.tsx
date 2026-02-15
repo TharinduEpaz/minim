@@ -11,10 +11,12 @@ import { Settings } from "./Settings";
 import { WallpaperSurface } from "./wallpaper/WallpaperSurface";
 import { WidgetProvider } from "./widgets/GridLayoutContext";
 import { CategoryTypes, SourceTypes } from "./gql/graphql";
-import { mdiAlertDecagram, mdiCog, mdiFire, mdiShimmer } from "@mdi/js";
+import { mdiAlertDecagram, mdiBookmarkOutline, mdiCog, mdiFire, mdiShimmer } from "@mdi/js";
 import { BottomBarButton } from "./components/BottomBarButton";
 import { WallpaperInfoSpinner } from "./WallpaperInfoSpinner";
 import { WidgetGrid } from "./widgets/WIdgetGrid";
+import { BookmarksSidebar } from "./components/BookmarksSidebar";
+import { Shortcuts } from "./components/Shortcuts";
 
 export function App() {
   const [tick, setTick] = useState(new Date().getTime());
@@ -26,6 +28,7 @@ export function App() {
   }, []);
 
   const [settingsOpen, setSettingsOpen] = useState<boolean>(false);
+  const [bookmarksSidebarOpen, setBookmarksSidebarOpen] = useState<boolean>(false);
   const [droppingWidgetData, setDroppingWidgetData] = useState<string | null>(
     null
   );
@@ -43,7 +46,13 @@ export function App() {
               />
             )}
 
+            <BookmarksSidebar
+              isOpen={bookmarksSidebarOpen}
+              onClose={() => setBookmarksSidebarOpen(false)}
+            />
+
             <div className="main-surface">
+              <Shortcuts />
               <WidgetGrid
                 tick={tick}
                 setDroppingWidgetData={setDroppingWidgetData}
@@ -59,6 +68,10 @@ export function App() {
                 </div>
                 <div className="bottom-right">
                   {/* <ChangeLogButton /> */}
+                  <BookmarksSidebarButton
+                    isOpen={bookmarksSidebarOpen}
+                    onClick={() => setBookmarksSidebarOpen((v) => !v)}
+                  />
                   <SettingsButton
                     setSettingsOpen={setSettingsOpen}
                     settingsOpen={settingsOpen}
@@ -89,6 +102,20 @@ export const SettingsButton = ({
     }}
     tooltip="Settings"
     icon={mdiCog}
+  />
+);
+
+export const BookmarksSidebarButton = ({
+  isOpen,
+  onClick,
+}: {
+  isOpen: boolean;
+  onClick: () => void;
+}) => (
+  <BottomBarButton
+    onClick={onClick}
+    tooltip={isOpen ? "Close bookmarks" : "Bookmarks"}
+    icon={mdiBookmarkOutline}
   />
 );
 

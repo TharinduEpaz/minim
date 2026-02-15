@@ -1,0 +1,20 @@
+{
+  "manifest_version": 2,
+  "name": "Minim: Minimalist New Tab",
+  "version": "3.1.95",
+  "description": "A minimal newtab for Firefox",
+  "permissions": ["bookmarks", "favicon"],
+  "chrome_url_overrides": {
+    "newtab": "index.html"
+  },
+  "icons": {
+    "16": "icon16.png",
+    "48": "icon48.png",
+    "128": "icon128.png"
+  },
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "minim@a.tulv.in"
+    }
+  }
+}

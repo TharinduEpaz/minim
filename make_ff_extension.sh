@@ -34,6 +34,7 @@ cat > "$EXT_DIR/manifest.json" <<EOL
   "name": "Minim: Minimalist New Tab",
   "version": "$VERSION",
   "description": "A minimal newtab for Firefox",
+  "permissions": ["bookmarks", "favicon"],
   "chrome_url_overrides": {
     "newtab": "index.html"
   },
