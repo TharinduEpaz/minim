@@ -28,7 +28,7 @@ export function App() {
   }, []);
 
   const [settingsOpen, setSettingsOpen] = useState<boolean>(false);
-  const [bookmarksSidebarOpen, setBookmarksSidebarOpen] = useState<boolean>(false);
+  const [bookmarksSidebarOpen, setBookmarksSidebarOpen] = useState<boolean>(true);
   const [droppingWidgetData, setDroppingWidgetData] = useState<string | null>(
     null
   );
@@ -48,6 +48,7 @@ export function App() {
 
             <BookmarksSidebar
               isOpen={bookmarksSidebarOpen}
+              onOpen={() => setBookmarksSidebarOpen(true)}
               onClose={() => setBookmarksSidebarOpen(false)}
             />
 

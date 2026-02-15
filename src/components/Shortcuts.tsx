@@ -1,248 +1,258 @@
-import { useCallback, useEffect, useState } from "react";
+import { memo, useEffect, useState } from "react";
 import { useWallpaper } from "../wallpaper/WallpaperContext";
 import { getFaviconUrl } from "../utils";
 import { Modal, Form, Button } from "react-bootstrap";
 
-const SHORTCUTS_KEY = "minim-shortcuts";
-const MAX_SHORTCUTS = 5;
+/* ── Types ─────────────────────────────────────────────── */
 
-export interface ShortcutItem {
+interface ShortcutItem {
   id: string;
   url: string;
   title: string;
 }
 
-// High-quality custom icons from Simple Icons (SVG)
-const CUSTOM_ICONS: Record<string, string> = {
-  "mail.google.com": "https://cdn.simpleicons.org/gmail/EA4335",
+/* ── Constants ─────────────────────────────────────────── */
+
+const STORAGE_KEY = "minim-shortcuts";
+const MAX_SHORTCUTS = 10;
+
+const BRAND_ICONS: Record<string, string> = {
+  "mail.google.com":   "https://cdn.simpleicons.org/gmail/EA4335",
   "gemini.google.com": "https://cdn.simpleicons.org/googlegemini/8E75B2",
-  "chatgpt.com": "https://cdn.simpleicons.org/openai/412991",
-  "chat.openai.com": "https://cdn.simpleicons.org/openai/412991",
-  "www.youtube.com": "https://cdn.simpleicons.org/youtube/FF0000",
-  "youtube.com": "https://cdn.simpleicons.org/youtube/FF0000",
-  "drive.google.com": "https://cdn.simpleicons.org/googledrive/4285F4",
+  "www.youtube.com":   "https://cdn.simpleicons.org/youtube/FF0000",
+  "youtube.com":       "https://cdn.simpleicons.org/youtube/FF0000",
+  "drive.google.com":  "https://cdn.simpleicons.org/googledrive/4285F4",
 };
 
-const defaultShortcuts: ShortcutItem[] = [
-  { id: "1", url: "https://mail.google.com", title: "Gmail" },
-  { id: "2", url: "https://gemini.google.com", title: "Gemini" },
-  { id: "3", url: "https://chatgpt.com", title: "ChatGPT" },
-  { id: "4", url: "https://www.youtube.com", title: "YouTube" },
-  { id: "5", url: "https://drive.google.com", title: "Drive" },
-];
+/* ── Helpers ───────────────────────────────────────────── */
 
-function getShortcutIconUrl(url: string): string {
+function iconUrl(url: string, size = 64): string {
   try {
     const host = new URL(url).hostname;
-    return CUSTOM_ICONS[host] ?? getFaviconUrl(url, 64);
-  } catch {
-    return getFaviconUrl(url, 64);
-  }
+    if (BRAND_ICONS[host]) return BRAND_ICONS[host];
+  } catch { /* fall through */ }
+  return getFaviconUrl(url, size);
 }
 
-function loadShortcuts(): ShortcutItem[] {
-  try {
-    const stored = localStorage.getItem(SHORTCUTS_KEY);
-    if (stored) {
-      const parsed = JSON.parse(stored) as ShortcutItem[];
-      return parsed.length <= MAX_SHORTCUTS ? parsed : parsed.slice(0, MAX_SHORTCUTS);
-    }
-  } catch {
-    // ignore
-  }
-  return defaultShortcuts;
-}
-
-function saveShortcuts(items: ShortcutItem[]) {
-  localStorage.setItem(SHORTCUTS_KEY, JSON.stringify(items));
-}
-
-function getLabel(item: ShortcutItem): string {
+function label(item: ShortcutItem): string {
   if (item.title) return item.title;
-  try {
-    return new URL(item.url).hostname.replace(/^www\./, "");
-  } catch {
-    return "Link";
-  }
+  try { return new URL(item.url).hostname.replace(/^www\./, ""); }
+  catch { return "Link"; }
 }
+
+function uid(): string {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+}
+
+/* ── Storage ───────────────────────────────────────────── */
+
+function load(): ShortcutItem[] {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) return (JSON.parse(raw) as ShortcutItem[]).slice(0, MAX_SHORTCUTS);
+  } catch { /* ignore */ }
+  return [];
+}
+
+function save(items: ShortcutItem[]) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+}
+
+/* ── Sub-components ────────────────────────────────────── */
+
+const ShortcutTile = memo(function ShortcutTile({ item, onEdit }: { item: ShortcutItem; onEdit: () => void }) {
+  return (
+    <div className="shortcut-tile">
+      <a
+        href={item.url}
+        className="shortcut-link"
+        rel="noopener noreferrer"
+      >
+        <div className="shortcut-icon-wrap">
+          <img src={iconUrl(item.url)} alt="" className="shortcut-icon" />
+        </div>
+        <span className="shortcut-label">{label(item)}</span>
+      </a>
+      <button
+        type="button"
+        className="shortcut-edit"
+        onClick={(e) => { e.stopPropagation(); onEdit(); }}
+        aria-label="Edit shortcut"
+      >
+        ✎
+      </button>
+    </div>
+  );
+});
+
+const AddTile = memo(function AddTile({ onClick }: { onClick: () => void }) {
+  return (
+    <div className="shortcut-tile">
+      <button type="button" className="shortcut-add" onClick={onClick}>
+        <div className="shortcut-icon-wrap shortcut-icon-wrap-add">
+          <span className="shortcut-add-icon">+</span>
+        </div>
+        <span className="shortcut-label">Add</span>
+      </button>
+    </div>
+  );
+});
+
+const IconPreview = memo(function IconPreview({ url }: { url: string }) {
+  if (!url) return null;
+  const src = iconUrl(url, 64);
+  return (
+    <div className="shortcut-preview">
+      <img
+        src={src}
+        alt=""
+        width={48}
+        height={48}
+        onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+      />
+    </div>
+  );
+});
+
+const EditModal = memo(function EditModal({
+  show,
+  isNew,
+  initialUrl,
+  initialTitle,
+  onSave,
+  onRemove,
+  onClose,
+}: {
+  show: boolean;
+  isNew: boolean;
+  initialUrl: string;
+  initialTitle: string;
+  onSave: (url: string, title: string) => void;
+  onRemove: () => void;
+  onClose: () => void;
+}) {
+  const [url, setUrl] = useState(initialUrl);
+  const [title, setTitle] = useState(initialTitle);
+
+  useEffect(() => {
+    if (show) { setUrl(initialUrl); setTitle(initialTitle); }
+  }, [show, initialUrl, initialTitle]);
+
+  const handleSave = () => {
+    const trimmed = url.trim();
+    if (!trimmed) return;
+    onSave(trimmed, title.trim());
+  };
+
+  return (
+    <Modal show={show} onHide={onClose} centered className="shortcuts-modal">
+      <Modal.Header closeButton>
+        <Modal.Title>{isNew ? "Add shortcut" : "Edit shortcut"}</Modal.Title>
+      </Modal.Header>
+
+      <Modal.Body>
+        <div className="shortcut-modal-preview-row">
+          <IconPreview url={url} />
+        </div>
+
+        <Form.Group className="mb-3">
+          <Form.Label>URL</Form.Label>
+          <Form.Control
+            type="url"
+            placeholder="https://example.com"
+            value={url}
+            onChange={(e) => setUrl(e.target.value)}
+            autoFocus
+          />
+        </Form.Group>
+
+        <Form.Group>
+          <Form.Label>Name</Form.Label>
+          <Form.Control
+            type="text"
+            placeholder="Site name (optional)"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+          />
+        </Form.Group>
+      </Modal.Body>
+
+      <Modal.Footer>
+        {!isNew && (
+          <Button variant="outline-danger" className="me-auto" onClick={onRemove}>
+            Remove
+          </Button>
+        )}
+        <Button variant="secondary" onClick={onClose}>Cancel</Button>
+        <Button variant="primary" onClick={handleSave} disabled={!url.trim()}>
+          {isNew ? "Add" : "Save"}
+        </Button>
+      </Modal.Footer>
+    </Modal>
+  );
+});
+
+/* ── Main component ────────────────────────────────────── */
 
 export function Shortcuts() {
   const { font } = useWallpaper();
-  const [shortcuts, setShortcuts] = useState<ShortcutItem[]>(loadShortcuts);
-  const [editingIndex, setEditingIndex] = useState<number | null>(null);
-  const [editUrl, setEditUrl] = useState("");
-  const [editTitle, setEditTitle] = useState("");
+  const [shortcuts, setShortcuts] = useState<ShortcutItem[]>(load);
+  const [editing, setEditing] = useState<{ index: number; isNew: boolean } | null>(null);
 
-  useEffect(() => {
-    saveShortcuts(shortcuts);
-  }, [shortcuts]);
+  // persist on change
+  useEffect(() => { save(shortcuts); }, [shortcuts]);
 
-  const ensureSlots = useCallback(() => {
-    setShortcuts((prev) => {
-      const result = [...prev];
-      while (result.length < MAX_SHORTCUTS) {
-        result.push({
-          id: String(Date.now() + result.length),
-          url: "",
-          title: "",
-        });
-      }
-      return result.slice(0, MAX_SHORTCUTS);
-    });
-  }, []);
+  const canAdd = shortcuts.length < MAX_SHORTCUTS;
+  const editItem = editing !== null ? shortcuts[editing.index] : null;
 
-  useEffect(() => {
-    ensureSlots();
-  }, [ensureSlots]);
-
-  const startEdit = (index: number) => {
-    const item = shortcuts[index];
-    setEditUrl(item?.url ?? "");
-    setEditTitle(item?.title ?? "");
-    setEditingIndex(index);
+  const openAdd = () => {
+    setEditing({ index: shortcuts.length, isNew: true });
   };
 
-  const saveEdit = () => {
-    if (editingIndex === null) return;
-    const url = editUrl.trim();
-    const title = editTitle.trim();
+  const openEdit = (index: number) => {
+    setEditing({ index, isNew: false });
+  };
+
+  const closeModal = () => setEditing(null);
+
+  const handleSave = (url: string, title: string) => {
+    if (!editing) return;
     setShortcuts((prev) => {
       const next = [...prev];
-      next[editingIndex] = {
-        id: next[editingIndex]?.id ?? String(Date.now()),
-        url: url || "",
-        title: title || "",
-      };
-      return next;
-    });
-    setEditingIndex(null);
-  };
-
-  const removeShortcut = (index: number) => {
-    setShortcuts((prev) => {
-      const next = prev.filter((_, i) => i !== index);
-      while (next.length < MAX_SHORTCUTS) {
-        next.push({ id: String(Date.now() + next.length), url: "", title: "" });
+      if (editing.isNew) {
+        next.push({ id: uid(), url, title });
+      } else {
+        next[editing.index] = { ...next[editing.index], url, title };
       }
       return next.slice(0, MAX_SHORTCUTS);
     });
-    setEditingIndex(null);
+    closeModal();
   };
 
-  const handleShortcutClick = (index: number) => {
-    const item = shortcuts[index];
-    if (item?.url) {
-      window.open(item.url, "_blank", "noopener,noreferrer");
-    } else {
-      startEdit(index);
-    }
+  const handleRemove = () => {
+    if (!editing || editing.isNew) return;
+    setShortcuts((prev) => prev.filter((_, i) => i !== editing.index));
+    closeModal();
   };
 
   return (
     <>
       <div className="shortcuts" style={{ fontFamily: font }}>
-        {shortcuts.map((item, index) => (
-          <div
-            key={item.id}
-            className={`shortcut-tile ${item.url ? "shortcut-tile-filled" : "shortcut-tile-empty"}`}
-          >
-            {item.url ? (
-              <>
-                <a
-                  href={item.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="shortcut-link"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    handleShortcutClick(index);
-                  }}
-                >
-                  <div className="shortcut-icon-wrap">
-                    <img
-                      src={getShortcutIconUrl(item.url)}
-                      alt=""
-                      className="shortcut-icon"
-                      width={64}
-                      height={64}
-                    />
-                  </div>
-                  <span className="shortcut-label">{getLabel(item)}</span>
-                </a>
-                <button
-                  type="button"
-                  className="shortcut-edit"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    startEdit(index);
-                  }}
-                  aria-label="Edit shortcut"
-                >
-                  ✎
-                </button>
-              </>
-            ) : (
-              <button
-                type="button"
-                className="shortcut-add"
-                onClick={() => startEdit(index)}
-              >
-                <span className="shortcut-add-icon">+</span>
-                <span className="shortcut-add-label">Add</span>
-              </button>
-            )}
-          </div>
+        {shortcuts.map((item, i) => (
+          <ShortcutTile key={item.id} item={item} onEdit={() => openEdit(i)} />
         ))}
+        {canAdd && <AddTile onClick={openAdd} />}
       </div>
 
-      <Modal
-        show={editingIndex !== null}
-        onHide={() => setEditingIndex(null)}
-        centered
-        className="shortcuts-modal"
-      >
-        <Modal.Header closeButton>
-          <Modal.Title>
-            {shortcuts[editingIndex ?? 0]?.url ? "Edit shortcut" : "Add shortcut"}
-          </Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          <Form.Group className="mb-3">
-            <Form.Label>URL</Form.Label>
-            <Form.Control
-              type="url"
-              placeholder="https://example.com"
-              value={editUrl}
-              onChange={(e) => setEditUrl(e.target.value)}
-            />
-          </Form.Group>
-          <Form.Group>
-            <Form.Label>Name (optional)</Form.Label>
-            <Form.Control
-              type="text"
-              placeholder="Site name"
-              value={editTitle}
-              onChange={(e) => setEditTitle(e.target.value)}
-            />
-          </Form.Group>
-        </Modal.Body>
-        <Modal.Footer>
-          {shortcuts[editingIndex ?? 0]?.url && (
-            <Button
-              variant="outline-danger"
-              onClick={() => editingIndex !== null && removeShortcut(editingIndex)}
-            >
-              Remove
-            </Button>
-          )}
-          <Button variant="secondary" onClick={() => setEditingIndex(null)}>
-            Cancel
-          </Button>
-          <Button variant="primary" onClick={saveEdit}>
-            Save
-          </Button>
-        </Modal.Footer>
-      </Modal>
+      <EditModal
+        show={editing !== null}
+        isNew={editing?.isNew ?? true}
+        initialUrl={editItem?.url ?? ""}
+        initialTitle={editItem?.title ?? ""}
+        onSave={handleSave}
+        onRemove={handleRemove}
+        onClose={closeModal}
+      />
     </>
   );
 }

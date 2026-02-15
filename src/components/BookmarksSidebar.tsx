@@ -13,6 +13,43 @@ function isBookmarksApiAvailable(): boolean {
   return typeof chrome !== "undefined" && !!chrome?.bookmarks;
 }
 
+const DEV_BOOKMARKS: BookmarkTreeNode[] = [
+  {
+    id: "dev-1",
+    title: "Bookmarks Bar",
+    children: [
+      { id: "dev-1-1", title: "Google", url: "https://www.google.com" },
+      { id: "dev-1-2", title: "GitHub", url: "https://github.com" },
+      { id: "dev-1-3", title: "Stack Overflow", url: "https://stackoverflow.com" },
+      {
+        id: "dev-1-4",
+        title: "Development",
+        children: [
+          { id: "dev-1-4-1", title: "MDN Web Docs", url: "https://developer.mozilla.org" },
+          { id: "dev-1-4-2", title: "TypeScript", url: "https://www.typescriptlang.org" },
+          { id: "dev-1-4-3", title: "Vite", url: "https://vitejs.dev" },
+        ],
+      },
+    ],
+  },
+  {
+    id: "dev-2",
+    title: "Other Bookmarks",
+    children: [
+      { id: "dev-2-1", title: "YouTube", url: "https://www.youtube.com" },
+      { id: "dev-2-2", title: "Reddit", url: "https://www.reddit.com" },
+      {
+        id: "dev-2-3",
+        title: "News",
+        children: [
+          { id: "dev-2-3-1", title: "Hacker News", url: "https://news.ycombinator.com" },
+          { id: "dev-2-3-2", title: "TechCrunch", url: "https://techcrunch.com" },
+        ],
+      },
+    ],
+  },
+];
+
 function bookmarkLabel(node: BookmarkTreeNode): string {
   if (node.title) return node.title;
   if (!node.url) return "Link";
@@ -25,9 +62,11 @@ function bookmarkLabel(node: BookmarkTreeNode): string {
 
 export function BookmarksSidebar({
   isOpen,
+  onOpen,
   onClose,
 }: {
   isOpen: boolean;
+  onOpen: () => void;
   onClose: () => void;
 }) {
   const { font } = useWallpaper();
@@ -46,9 +85,14 @@ export function BookmarksSidebar({
   }, []);
 
   useEffect(() => {
-    if (!isOpen || !isBookmarksApiAvailable()) {
+    if (!isOpen) return;
+
+    if (!isBookmarksApiAvailable()) {
+      // Dev mode: use dummy bookmarks
+      setBookmarks(DEV_BOOKMARKS);
+      setExpandedIds(new Set(DEV_BOOKMARKS.map((n) => n.id)));
       setLoading(false);
-      if (!isBookmarksApiAvailable()) setError("Bookmarks unavailable");
+      setError(null);
       return;
     }
 
@@ -57,7 +101,7 @@ export function BookmarksSidebar({
 
     chrome.bookmarks.getTree((tree) => {
       const roots = (tree[0]?.children ?? []).filter(
-        (n) => n.children?.length || n.url
+        (n: BookmarkTreeNode) => n.children?.length || n.url
       ) as BookmarkTreeNode[];
       setBookmarks(roots);
       setExpandedIds(new Set(roots.map((n) => n.id)));
@@ -65,7 +109,14 @@ export function BookmarksSidebar({
     });
   }, [isOpen]);
 
-  if (!isOpen) return null;
+  if (!isOpen) {
+    return (
+      <div
+        className="bookmarks-sidebar-trigger"
+        onMouseEnter={onOpen}
+      />
+    );
+  }
 
   return (
     <>
@@ -78,6 +129,7 @@ export function BookmarksSidebar({
         className="bookmarks-sidebar"
         style={{ fontFamily: font }}
         role="navigation"
+        onMouseLeave={onClose}
       >
         <div className="bookmarks-sidebar-header">
           <span className="bookmarks-sidebar-title">Bookmarks</span>
