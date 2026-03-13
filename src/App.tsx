@@ -28,7 +28,7 @@ export function App() {
   }, []);
 
   const [settingsOpen, setSettingsOpen] = useState<boolean>(false);
-  const [bookmarksSidebarOpen, setBookmarksSidebarOpen] = useState<boolean>(true);
+  const [bookmarksSidebarOpen, setBookmarksSidebarOpen] = useState<boolean>(false);
   const [droppingWidgetData, setDroppingWidgetData] = useState<string | null>(
     null
   );
